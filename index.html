@@ -1,556 +1,226 @@
-<!DOCTYPE html>
-<html lang="id">
-<head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Lucky Draw Wheel</title>
+// ===============================
+//       DAFTAR HADIAH
+// ===============================
+const segments = [
+  "Voucher 10k",
+  "Voucher 20k",
+  "Voucher 30k",
+  "Voucher 40k",
+  "Voucher 50k",
+  "Voucher 60k",
+  "Voucher 75k",
+  "Voucher 100k",
+];
 
-<link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@600;700;800&family=Poppins:wght@300;400;500;600&display=swap" rel="stylesheet">
+const wheel = document.getElementById("wheel");
+const spinBtn = document.getElementById("spinBtn");
+const resultBanner = document.getElementById("resultBanner");
+const memberInput = document.getElementById("memberId");
+const verifyBtn = document.getElementById("verifyBtn");
+const waBtn = document.getElementById("waBtn");
+const resetBtn = document.getElementById("resetBtn");
+const prizeList = document.getElementById("prizeList");
 
-  <style>
-    * {
-      box-sizing: border-box;
-    }
+const segCount = segments.length;
+const angle = 360 / segCount;
 
-    body {
-  margin: 0;
-  padding: 0;
-  font-family: Arial, sans-serif;
-  color: #f8f8f8;
-  display: flex;
-  min-height: 100vh;
-  align-items: center;
-  justify-content: center;
-  overflow: hidden;
-  position: relative;
+// isi daftar hadiah di panel kanan
+segments
+  .filter((val, idx, arr) => arr.indexOf(val) === idx) // unikkan
+  .forEach((prize) => {
+    const li = document.createElement("li");
+    li.textContent = prize;
+    prizeList.appendChild(li);
+  });
+
+// ===============================
+//     WARNA SLICE (GRADIENT)
+// ===============================
+const sliceColors = [
+  "#d4af37", // Voucher 50k - emas tua
+  "#f5d142", // Voucher 100k - emas cerah
+  "#f7e27b", // Voucher 20k - emas muda
+  "#e6bf3c", // Voucher 10k - gold gelap
+  "#43ff3b", // Voucher 75k - hijau Gucci
+  "#3ccc2f", // Voucher 50k hijau
+  "#2faa28", // Voucher 10k hijau gelap
+  "#5dff57"  // Voucher 20k hijau muda
+];
+
+const colors = segments
+  .map((_, i) => {
+    const start = i * angle;
+    const end = (i + 1) * angle;
+    return `${sliceColors[i]} ${start}deg ${end}deg`;
+  })
+  .join(", ");
+
+wheel.style.background = `conic-gradient(${colors})`;
+
+// ===============================
+//   LABEL HADIAH RESPONSIVE
+// ===============================
+function renderLabels() {
+  const oldLabels = wheel.querySelectorAll(".segment-label");
+  oldLabels.forEach((el) => el.remove());
+
+  const rect = wheel.getBoundingClientRect();
+  const wheelSize = rect.width;
+  const radius = wheelSize / 2;
+  const textRadius = radius * 0.62;
+
+  segments.forEach((name, i) => {
+    const label = document.createElement("div");
+    label.className = "segment-label";
+    label.innerText = name;
+
+    const angleDeg = -90 + angle * (i + 0.5);
+    const angleRad = (angleDeg * Math.PI) / 180;
+
+    const cx = radius + Math.cos(angleRad) * textRadius;
+    const cy = radius + Math.sin(angleRad) * textRadius;
+
+    label.style.left = `${cx}px`;
+    label.style.top = `${cy}px`;
+
+    wheel.appendChild(label);
+  });
 }
 
-body::before {
-    content: "";
-    position: fixed;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
-    background:
-      linear-gradient(rgba(0,0,0,0.78), rgba(0,0,0,0.78)),
-      url("assets/bg.jpg") center/cover no-repeat;
-    filter: blur(14px);
-    z-index: -1;
+renderLabels();
+window.addEventListener("resize", renderLabels);
+
+// ===============================
+//   SISTEM MEMBER & BATAS SPIN
+// ===============================
+const MAX_SPIN_PER_MEMBER = 1;
+const STORAGE_KEY_PREFIX = "lucky_spin_member_";
+let currentMemberId = null;
+
+function getSpinCountFor(id) {
+  const raw = localStorage.getItem(STORAGE_KEY_PREFIX + id);
+  return raw ? parseInt(raw, 10) : 0;
 }
 
-    .page {
-      width: 100%;
-      max-width: 1000px;
-      padding: 20px;
-    }
-
-    .card {
-  background: rgba(0, 0, 0, 0.35); /* transparan gelap */
-  backdrop-filter: blur(18px);     /* BLUR UTAMA */
-  -webkit-backdrop-filter: blur(18px); /* untuk Safari */
-
-  border-radius: 22px;
-  padding: 26px 28px 30px;
-
-  /* Shadow mewah */
-  box-shadow:
-    0 20px 60px rgba(0, 0, 0, 0.85),
-    inset 0 0 0 1px rgba(255, 255, 255, 0.07);
-
-  /* Border kaca */
-  border: 1px solid rgba(255, 255, 255, 0.08);
-
-  /* Tambahan efek premium */
-  position: relative;
+function setSpinCountFor(id, count) {
+  localStorage.setItem(STORAGE_KEY_PREFIX + id, String(count));
 }
 
-.card::before {
-  content: "";
-  position: absolute;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 100%;
-  border-radius: inherit;
-
-  /* Refleksi kaca lembut */
-  background: linear-gradient(
-    120deg,
-    rgba(255, 255, 255, 0.08) 0%,
-    rgba(255, 255, 255, 0.02) 45%,
-    rgba(255, 255, 255, 0.05) 100%
-  );
-
-  pointer-events: none;
-}
-
-    .card-header h1 {
-      margin: 0 0 6px;
-      font-size: 26px;
-      letter-spacing: 1px;
-      text-transform: uppercase;
-      color: #ffd24a;
-    }
-
-    .card-header p {
-      margin: 0 0 60px;
-      font-size: 13px;
-      color: #dddddd;
-    }
-
-    .card-body {
-      display: flex;
-      gap: 24px;
-      flex-wrap: wrap;
-      align-items: center;
-      justify-content: center;
-    }
-
-    .wheel-container {
-      position: relative;
-    }
-
-    .pointer {
-  position: absolute;
-  top: -48px;
-  left: 50%;
-  transform: translateX(-50%);
-  width: 0;
-  height: 0;
-
-  /* bentuk panah */
-  border-left: 26px solid transparent;
-  border-right: 26px solid transparent;
-  border-top: 48px solid #ffd84d;  /* Gold Base */
-
-  /* efek glow kombinasi */
-  filter:
-      drop-shadow(0 0 6px rgba(255, 215, 0, 0.9))   /* gold glow */
-      drop-shadow(0 0 14px rgba(255, 180, 0, 0.8))  /* warm aura */
-      drop-shadow(0 0 25px rgba(255, 0, 0, 0.6))    /* red neon aura */
-      drop-shadow(0 4px 10px rgba(0,0,0,0.8));      /* 3D shadow */
-
-  /* animasi blink + breathing glow */
-  animation: premiumGlow 1.6s infinite ease-in-out;
-  z-index: 30;
-}
-
-/* Animasi glow */
-@keyframes premiumGlow {
-  0% {
-    filter:
-      drop-shadow(0 0 4px rgba(255, 215, 0, 0.9))
-      drop-shadow(0 0 10px rgba(255, 180, 0, 0.8))
-      drop-shadow(0 0 18px rgba(255, 0, 0, 0.4))
-      drop-shadow(0 4px 10px rgba(0,0,0,0.8));
-  }
-  100% {
-    filter:
-      drop-shadow(0 0 12px rgba(255, 255, 100, 1))
-      drop-shadow(0 0 25px rgba(255, 200, 0, 1))
-      drop-shadow(0 0 35px rgba(255, 0, 0, 0.9))
-      drop-shadow(0 6px 12px rgba(0,0,0,0.9));
+function setResult(message, type = "info") {
+  resultBanner.textContent = message;
+  resultBanner.classList.remove("result-success", "result-info");
+  if (type === "success") {
+    resultBanner.classList.add("result-success");
+  } else {
+    resultBanner.classList.add("result-info");
   }
 }
 
-    /* Roda versi premium */
-#wheel {
-  width: min(60vw, 380px);
-  height: min(60vw, 380px);
-  border-radius: 50%;
-  position: relative;
-  overflow: hidden;
+// ===============================
+//   VERIFIKASI MEMBER
+// ===============================
+verifyBtn.onclick = () => {
+  const id = memberInput.value.trim();
+  if (!id) {
+    alert("Masukkan Nomor / ID Member terlebih dahulu.");
+    return;
+  }
 
-  /* outer ring emas */
-  background-color: #1a1a1a;
-  border: 6px solid #caa33a;
+  currentMemberId = id;
 
-  /* glow & shadow */
-  box-shadow:
-    0 0 0 3px #f5e3a1,
-    0 18px 40px rgba(0, 0, 0, 0.9),
-    0 0 45px rgba(0, 0, 0, 0.85);
-
-  transition: transform 5s ease, box-shadow 0.4s ease;
-}
-
-#wheel.wheel-spinning {
-  box-shadow:
-    0 0 0 3px #ffeaa0,
-    0 0 30px rgba(255, 223, 128, 0.9),
-    0 26px 60px rgba(0, 0, 0, 1);
-}
-
-#wheel::before {
-  content: "";
-  position: absolute;
-  inset: 12px;
-  border-radius: 50%;
-  border: 3px solid rgba(255, 255, 255, 0.18);
-  box-shadow:
-    inset 0 0 18px rgba(0, 0, 0, 0.7),
-    0 0 18px rgba(255, 255, 255, 0.12);
-  pointer-events: none;
-}
-
-#wheel::after {
-  content: "";
-  position: absolute;
-  inset: 0;
-  border-radius: 50%;
-  background:
-    radial-gradient(circle at 30% 15%, rgba(255,255,255,0.45), transparent 60%),
-    radial-gradient(circle at 70% 85%, rgba(0,0,0,0.55), transparent 55%);
-  mix-blend-mode: screen;
-  opacity: 0.7;
-  pointer-events: none;
-}
-
-.wheel-center {
-  position: absolute;
-  width: 18%;
-  height: 18%;
-  border-radius: 50%;
-  top: 50%;
-  left: 50%;
-  transform: translate(-50%, -50%);
-  z-index: 5;
-
-  background: radial-gradient(circle at 30% 30%, #444, #050505);
-  border: 4px solid #000;
-
-  box-shadow:
-    0 0 12px rgba(0,0,0,0.9),
-    inset 0 2px 5px rgba(255,255,255,0.15);
-}
-
-    .segment-label {
-      position: absolute;
-      width: 40%;
-      text-align: center;
-      font-size: 12px;
-      font-weight: bold;
-      pointer-events: none;
-      transform: translate(-50%, -50%);
-      color: #111;
-      text-shadow: 0 1px 2px rgba(255, 255, 255, 0.8);
-    }
-
-    .detail-panel {
-      min-width: 240px;
-      flex: 1;
-    }
-
-    .detail-panel h2 {
-      margin: 0 0 10px;
-      font-size: 16px;
-      color: #ffd24a;
-      text-transform: uppercase;
-    }
-
-    .detail-panel ul {
-      margin: 0 0 16px;
-      padding-left: 18px;
-      font-size: 13px;
-      color: #f1f1f1;
-    }
-
-    .btn-row {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 10px;
-    }
-
-    button,
-    .btn-link {
-      font-family: inherit;
-    }
-
-    .btn {
-      border-radius: 999px;
-      border: none;
-      padding: 10px 20px;
-      font-size: 13px;
-      font-weight: 600;
-      cursor: pointer;
-      transition: 0.15s ease;
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-      gap: 6px;
-    }
-
-    .btn-gold {
-      background: linear-gradient(135deg, #ffd24a, #f0a400);
-      color: #111;
-      box-shadow: 0 6px 16px rgba(0,0,0,0.6);
-    }
-
-    .btn-gold:hover {
-      transform: translateY(-1px);
-      box-shadow: 0 8px 18px rgba(0,0,0,0.7);
-    }
-
-    .btn-wa {
-      background: #25d366;
-      color: #041307;
-      box-shadow: 0 6px 14px rgba(0,0,0,0.6);
-      text-decoration: none;
-    }
-
-    .btn-wa:hover {
-      background: #1bb556;
-      transform: translateY(-1px);
-    }
-
-    .btn-outline {
-      background: transparent;
-      color: #f4f4f4;
-      border: 1px solid #666;
-    }
-
-    .btn-outline:hover {
-      background: #222;
-    }
-
-    .btn.danger {
-      border-color: #ff5c5c;
-      color: #ff7777;
-    }
-
-    .btn:disabled {
-      opacity: 0.6;
-      cursor: not-allowed;
-      box-shadow: none;
-      transform: none;
-    }
-
-    .card-footer {
-      margin-top: 20px;
-      border-top: 1px solid #222;
-      padding-top: 16px;
-    }
-
-    .input-row {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 10px;
-      align-items: center;
-    }
-
-    #memberId {
-      flex: 1;
-      min-width: 180px;
-      padding: 10px 12px;
-      border-radius: 999px;
-      border: 1px solid #444;
-      background: #111;
-      color: #f8f8f8;
-      font-size: 13px;
-      outline: none;
-    }
-
-    #memberId::placeholder {
-      color: #777;
-    }
-
-    .action-buttons {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 10px;
-      margin-top: 10px;
-    }
-
-    #resultBanner {
-      margin-top: 16px;
-      padding: 10px 14px;
-      border-radius: 12px;
-      font-size: 13px;
-      background: #111;
-      border: 1px solid #333;
-      color: #f1f1f1;
-    }
-
-    .result-success {
-      border-color: #2ecc71;
-      background: rgba(46, 204, 113, 0.1);
-      color: #b7ffd2;
-    }
-
-    .result-info {
-      border-color: #444;
-      background: #111;
-      color: #ddd;
-    }
-
-    .small-note {
-      margin-top: 8px;
-      font-size: 11px;
-      color: #aaaaaa;
-    }
-
-    @media (max-width: 700px) {
-      .card {
-        padding: 18px 16px 22px;
-      }
-      .card-header p {
-  margin: 0 0 16px;
-  font-size: 13px;
-  color: #dddddd;
-}
-
-/* === FONT GUCCI PREMIUM === */
-.title-gucci {
-    font-family: 'Cinzel', serif;
-    font-weight: 700;
-    letter-spacing: 1.5px;
-    color: #f4d76e;              /* warna emas */
-    text-shadow: 0 0 8px rgba(255, 215, 120, 0.5);
-}
-
-.subtitle-gucci {
-    font-family: 'Poppins', sans-serif;
-    font-weight: 300;
-    color: #dcdcdc;
-    font-size: 13px;
-    margin-top: -8px;
-}
-
-    }
-/* === EFEK EMAS PREMIUM UNTUK PANEL DETAIL HADIAH === */
-
-/* Glow lembut di panel */
-.detail-panel {
-    animation: panelGlow 4s ease-in-out infinite alternate;
-}
-
-/* Judul dengan gradient emas bergerak */
-.detail-panel h2 {
-    position: relative;
-    display: inline-block;
-
-    background: linear-gradient(
-        120deg,
-        #c9a23a,
-        #f8e49a,
-        #f1c45d,
-        #fff4c0
+  const spinCount = getSpinCountFor(id);
+  if (spinCount >= MAX_SPIN_PER_MEMBER) {
+    spinBtn.disabled = true;
+    setResult(
+      `ID ${id} sudah menggunakan kesempatan spin (${MAX_SPIN_PER_MEMBER}x).`,
+      "info"
     );
-    background-size: 250% 250%;
-    -webkit-background-clip: text;
-    -webkit-text-fill-color: transparent;
+  } else {
+    spinBtn.disabled = false;
+    setResult(`ID ${id} terverifikasi. Klik "Spin Sekarang" untuk mulai.`, "info");
+  }
 
-    animation: goldFlow 3.5s linear infinite;
-}
+  // siapkan link WhatsApp (akan ditambah hadiah setelah spin)
+  const adminNumber = "6281312345678"; // GANTI ke nomor adminmu (tanpa +)
+  const baseMessage = `Halo Admin, saya ingin klaim hadiah Lucky Draw.\nID Member: ${id}\nHadiah: (isi setelah spin).`;
+  const encoded = encodeURIComponent(baseMessage);
+  waBtn.href = `https://wa.me/${adminNumber}?text=${encoded}`;
+};
 
-/* Garis tipis emas di bawah judul */
-.detail-panel h2::after {
-    content: "";
-    position: absolute;
-    left: 0;
-    bottom: -6px;
-    width: 100%;
-    height: 2px;
-    border-radius: 999px;
-    background: linear-gradient(90deg, #f9df8b, #f5c24f, #f9df8b);
-    box-shadow: 0 0 8px rgba(249, 223, 139, 0.8);
-}
+// ===============================
+//        LOGIKA SPIN
+// ===============================
+let spinning = false;
 
-/* Animasi gradient emas */
-@keyframes goldFlow {
-    0%   { background-position: 0% 50%; }
-    50%  { background-position: 100% 50%; }
-    100% { background-position: 0% 50%; }
-}
+spinBtn.onclick = () => {
+  if (spinning) return;
+  if (!currentMemberId) {
+    alert("Verifikasi ID member terlebih dahulu.");
+    return;
+  }
 
-}
+  const spinCount = getSpinCountFor(currentMemberId);
+  if (spinCount >= MAX_SPIN_PER_MEMBER) {
+    alert("Kamu sudah mencapai batas spin.");
+    setResult(
+      `ID ${currentMemberId} sudah menggunakan kesempatan spin.`,
+      "info"
+    );
+    spinBtn.disabled = true;
+    return;
+  }
 
-/* Animasi glow panel */
-@keyframes panelGlow {
-    0% {
-        box-shadow:
-          0 0 22px rgba(0, 0, 0, 0.8),
-          0 0 0 rgba(255, 210, 90, 0.0);
-        border-color: rgba(255, 215, 100, 0.35);
+  spinning = true;
+  spinBtn.disabled = true;
+  setResult("Roda sedang berputar...", "info");
+
+  const randomDeg = 3600 + Math.floor(Math.random() * 360);
+  wheel.style.transition = "all 5s ease";
+  wheel.style.transform = `rotate(${randomDeg}deg)`;
+
+  setTimeout(() => {
+    const finalDeg = randomDeg % 360;
+    const winnerIndex = Math.floor((segCount - finalDeg / angle) % segCount);
+    const prize = segments[winnerIndex];
+
+    // simpan spin untuk member
+    setSpinCountFor(currentMemberId, spinCount + 1);
+
+    setResult(
+      `🎉 Selamat ID ${currentMemberId}, kamu menang: ${prize}!`,
+      "success"
+    );
+
+    // update link WA dengan hadiah beneran
+    const adminNumber = "6281312345678"; // sama seperti di atas
+    const message = `Halo Admin, saya ingin klaim hadiah Lucky Draw.\nID Member: ${currentMemberId}\nHadiah: ${prize}`;
+    const encoded = encodeURIComponent(message);
+    waBtn.href = `https://wa.me/${adminNumber}?text=${encoded}`;
+
+    spinning = false;
+
+    // karena MAX_SPIN_PER_MEMBER = 1, langsung disable
+    if (spinCount + 1 >= MAX_SPIN_PER_MEMBER) {
+      spinBtn.disabled = true;
+    } else {
+      spinBtn.disabled = false;
     }
-    100% {
-        box-shadow:
-          0 0 26px rgba(0, 0, 0, 0.9),
-          0 0 30px rgba(255, 210, 90, 0.32);
-        border-color: rgba(255, 225, 130, 0.85);
-    }
-}
+  }, 5200);
+};
 
-  </style>
-</head>
-<body>
-  <div class="page">
-    <div class="card">
-      <div class="card-header">
-        <h1 class="title-gucci">GUCCI INDONESIA — Lucky Draw</h1>
-        <p> Masukkan Nomor/ID Member lalu putar roda. 1 member hanya 1x spin.</p>
+// ===============================
+//        RESET ADMIN
+// ===============================
+resetBtn.onclick = () => {
+  const confirmReset = confirm(
+    "Reset semua data spin di browser ini? (Hanya admin yang boleh melakukan ini)"
+  );
+  if (!confirmReset) return;
 
-      </div>
+  Object.keys(localStorage)
+    .filter((k) => k.startsWith(STORAGE_KEY_PREFIX))
+    .forEach((k) => localStorage.removeItem(k));
 
-      <div class="card-body">
-        <!-- Wheel -->
-        <div class="wheel-container">
-          <div class="pointer"></div>
-          <div id="wheel">
-            <div class="wheel-center"></div>
-          </div>
-        </div>
-
-        <!-- Detail hadiah + tombol WA / Reset -->
-        <div class="detail-panel">
-          <h2 class="title-gucci">Detail Hadiah</h2>
-          <ul id="prizeList">
-            <!-- diisi otomatis dari app.js -->
-          </ul>
-
-          <div class="btn-row">
-            <a id="waBtn" class="btn btn-wa btn-link" href="#" target="_blank">
-              Klaim via WhatsApp
-            </a>
-            <button id="resetBtn" class="btn btn-outline danger" type="button">
-              Reset (Admin)
-            </button>
-          </div>
-
-          <div class="small-note" id="adminInfo">
-            Nomor admin WhatsApp: <b>+62 813-1234-5678</b><br />
-            Silakan screenshot hasil menang dan kirim ke admin untuk klaim.
-          </div>
-        </div>
-      </div>
-
-      <!-- Footer: input member + tombol -->
-      <div class="card-footer">
-        <div class="input-row">
-          <input
-            id="memberId"
-            type="text"
-            placeholder="Masukkan Nomor / ID Member"
-          />
-          <button id="verifyBtn" class="btn btn-outline" type="button">
-            Verifikasi
-          </button>
-        </div>
-
-        <div class="action-buttons">
-          <button id="spinBtn" class="btn btn-gold" type="button" disabled>
-           Spin Sekarang
-          </button>
-        </div>
-
-        <div id="resultBanner" class="result-info">
-          Silakan masukkan ID member dan klik Verifikasi.
-        </div>
-      </div>
-    </div>
-  </div>
-
-  <script src="app.js"></script>
-</body>
-</html>
+  setResult("Data spin dihapus. Semua ID bisa spin lagi.", "info");
+  spinBtn.disabled = !currentMemberId;
+};
