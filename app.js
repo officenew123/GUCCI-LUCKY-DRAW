@@ -1,0 +1,226 @@
+// ===============================
+//       DAFTAR HADIAH
+// ===============================
+const segments = [
+  "Voucher 50k",
+  "Voucher 100k",
+  "Voucher 20k",
+  "Voucher 10k",
+  "Voucher 75k",
+  "Voucher 50k",
+  "Voucher 10k",
+  "Voucher 20k",
+];
+
+const wheel = document.getElementById("wheel");
+const spinBtn = document.getElementById("spinBtn");
+const resultBanner = document.getElementById("resultBanner");
+const memberInput = document.getElementById("memberId");
+const verifyBtn = document.getElementById("verifyBtn");
+const waBtn = document.getElementById("waBtn");
+const resetBtn = document.getElementById("resetBtn");
+const prizeList = document.getElementById("prizeList");
+
+const segCount = segments.length;
+const angle = 360 / segCount;
+
+// isi daftar hadiah di panel kanan
+segments
+  .filter((val, idx, arr) => arr.indexOf(val) === idx) // unikkan
+  .forEach((prize) => {
+    const li = document.createElement("li");
+    li.textContent = prize;
+    prizeList.appendChild(li);
+  });
+
+// ===============================
+//     WARNA SLICE (GRADIENT)
+// ===============================
+const sliceColors = [
+  "#d4af37", // Voucher 50k - emas tua
+  "#f5d142", // Voucher 100k - emas cerah
+  "#f7e27b", // Voucher 20k - emas muda
+  "#e6bf3c", // Voucher 10k - gold gelap
+  "#43ff3b", // Voucher 75k - hijau Gucci
+  "#3ccc2f", // Voucher 50k hijau
+  "#2faa28", // Voucher 10k hijau gelap
+  "#5dff57"  // Voucher 20k hijau muda
+];
+
+const colors = segments
+  .map((_, i) => {
+    const start = i * angle;
+    const end = (i + 1) * angle;
+    return `${sliceColors[i]} ${start}deg ${end}deg`;
+  })
+  .join(", ");
+
+wheel.style.background = `conic-gradient(${colors})`;
+
+// ===============================
+//   LABEL HADIAH RESPONSIVE
+// ===============================
+function renderLabels() {
+  const oldLabels = wheel.querySelectorAll(".segment-label");
+  oldLabels.forEach((el) => el.remove());
+
+  const rect = wheel.getBoundingClientRect();
+  const wheelSize = rect.width;
+  const radius = wheelSize / 2;
+  const textRadius = radius * 0.62;
+
+  segments.forEach((name, i) => {
+    const label = document.createElement("div");
+    label.className = "segment-label";
+    label.innerText = name;
+
+    const angleDeg = -90 + angle * (i + 0.5);
+    const angleRad = (angleDeg * Math.PI) / 180;
+
+    const cx = radius + Math.cos(angleRad) * textRadius;
+    const cy = radius + Math.sin(angleRad) * textRadius;
+
+    label.style.left = `${cx}px`;
+    label.style.top = `${cy}px`;
+
+    wheel.appendChild(label);
+  });
+}
+
+renderLabels();
+window.addEventListener("resize", renderLabels);
+
+// ===============================
+//   SISTEM MEMBER & BATAS SPIN
+// ===============================
+const MAX_SPIN_PER_MEMBER = 1;
+const STORAGE_KEY_PREFIX = "lucky_spin_member_";
+let currentMemberId = null;
+
+function getSpinCountFor(id) {
+  const raw = localStorage.getItem(STORAGE_KEY_PREFIX + id);
+  return raw ? parseInt(raw, 10) : 0;
+}
+
+function setSpinCountFor(id, count) {
+  localStorage.setItem(STORAGE_KEY_PREFIX + id, String(count));
+}
+
+function setResult(message, type = "info") {
+  resultBanner.textContent = message;
+  resultBanner.classList.remove("result-success", "result-info");
+  if (type === "success") {
+    resultBanner.classList.add("result-success");
+  } else {
+    resultBanner.classList.add("result-info");
+  }
+}
+
+// ===============================
+//   VERIFIKASI MEMBER
+// ===============================
+verifyBtn.onclick = () => {
+  const id = memberInput.value.trim();
+  if (!id) {
+    alert("Masukkan Nomor / ID Member terlebih dahulu.");
+    return;
+  }
+
+  currentMemberId = id;
+
+  const spinCount = getSpinCountFor(id);
+  if (spinCount >= MAX_SPIN_PER_MEMBER) {
+    spinBtn.disabled = true;
+    setResult(
+      `ID ${id} sudah menggunakan kesempatan spin (${MAX_SPIN_PER_MEMBER}x).`,
+      "info"
+    );
+  } else {
+    spinBtn.disabled = false;
+    setResult(`ID ${id} terverifikasi. Klik "Spin Sekarang" untuk mulai.`, "info");
+  }
+
+  // siapkan link WhatsApp (akan ditambah hadiah setelah spin)
+  const adminNumber = "6281312345678"; // GANTI ke nomor adminmu (tanpa +)
+  const baseMessage = `Halo Admin, saya ingin klaim hadiah Lucky Draw.\nID Member: ${id}\nHadiah: (isi setelah spin).`;
+  const encoded = encodeURIComponent(baseMessage);
+  waBtn.href = `https://wa.me/${adminNumber}?text=${encoded}`;
+};
+
+// ===============================
+//        LOGIKA SPIN
+// ===============================
+let spinning = false;
+
+spinBtn.onclick = () => {
+  if (spinning) return;
+  if (!currentMemberId) {
+    alert("Verifikasi ID member terlebih dahulu.");
+    return;
+  }
+
+  const spinCount = getSpinCountFor(currentMemberId);
+  if (spinCount >= MAX_SPIN_PER_MEMBER) {
+    alert("Kamu sudah mencapai batas spin.");
+    setResult(
+      `ID ${currentMemberId} sudah menggunakan kesempatan spin.`,
+      "info"
+    );
+    spinBtn.disabled = true;
+    return;
+  }
+
+  spinning = true;
+  spinBtn.disabled = true;
+  setResult("Roda sedang berputar...", "info");
+
+  const randomDeg = 3600 + Math.floor(Math.random() * 360);
+  wheel.style.transition = "all 5s ease";
+  wheel.style.transform = `rotate(${randomDeg}deg)`;
+
+  setTimeout(() => {
+    const finalDeg = randomDeg % 360;
+    const winnerIndex = Math.floor((segCount - finalDeg / angle) % segCount);
+    const prize = segments[winnerIndex];
+
+    // simpan spin untuk member
+    setSpinCountFor(currentMemberId, spinCount + 1);
+
+    setResult(
+      `🎉 Selamat ID ${currentMemberId}, kamu menang: ${prize}!`,
+      "success"
+    );
+
+    // update link WA dengan hadiah beneran
+    const adminNumber = "6281312345678"; // sama seperti di atas
+    const message = `Halo Admin, saya ingin klaim hadiah Lucky Draw.\nID Member: ${currentMemberId}\nHadiah: ${prize}`;
+    const encoded = encodeURIComponent(message);
+    waBtn.href = `https://wa.me/${adminNumber}?text=${encoded}`;
+
+    spinning = false;
+
+    // karena MAX_SPIN_PER_MEMBER = 1, langsung disable
+    if (spinCount + 1 >= MAX_SPIN_PER_MEMBER) {
+      spinBtn.disabled = true;
+    } else {
+      spinBtn.disabled = false;
+    }
+  }, 5200);
+};
+
+// ===============================
+//        RESET ADMIN
+// ===============================
+resetBtn.onclick = () => {
+  const confirmReset = confirm(
+    "Reset semua data spin di browser ini? (Hanya admin yang boleh melakukan ini)"
+  );
+  if (!confirmReset) return;
+
+  Object.keys(localStorage)
+    .filter((k) => k.startsWith(STORAGE_KEY_PREFIX))
+    .forEach((k) => localStorage.removeItem(k));
+
+  setResult("Data spin dihapus. Semua ID bisa spin lagi.", "info");
+  spinBtn.disabled = !currentMemberId;
+};
